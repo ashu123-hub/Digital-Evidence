@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DEMS - Digital Evidence Management{% endblock %}</title>
+    <meta name="description" content="Digital Evidence Management System for Cyber Forensics & Crime Investigation">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}app-body{% endblock %}">
+
+{% if session.get('user_id') %}
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="logo-text">
+            <span class="logo-title">DEMS</span>
+            <span class="logo-sub">Forensic Evidence</span>
+        </div>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="nav-section">
+            <span class="nav-section-label">Main</span>
+            <a href="{{ url_for('main.dashboard') }}" class="nav-item {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
+                <i class="fas fa-gauge-high"></i><span>Dashboard</span>
+            </a>
+        </div>
+        <div class="nav-section">
+            <span class="nav-section-label">Investigation</span>
+            <a href="{{ url_for('cases.list_cases') }}" class="nav-item {% if 'cases' in request.endpoint %}active{% endif %}">
+                <i class="fas fa-folder-open"></i><span>Cases</span>
+            </a>
+            <a href="{{ url_for('evidence.list_evidence') }}" class="nav-item {% if 'evidence' in request.endpoint %}active{% endif %}">
+                <i class="fas fa-file-shield"></i><span>Evidence</span>
+            </a>
+            <a href="{{ url_for('evidence.upload_evidence') }}" class="nav-item {% if request.endpoint == 'evidence.upload_evidence' %}active{% endif %}">
+                <i class="fas fa-cloud-arrow-up"></i><span>Upload Evidence</span>
+            </a>
+        </div>
+        <div class="nav-section">
+            <span class="nav-section-label">Security</span>
+            <a href="{{ url_for('main.audit_logs') }}" class="nav-item {% if request.endpoint == 'main.audit_logs' %}active{% endif %}">
+                <i class="fas fa-clipboard-list"></i><span>Audit Logs</span>
+            </a>
+            <a href="{{ url_for('reports.list_reports') }}" class="nav-item {% if 'reports' in request.endpoint %}active{% endif %}">
+                <i class="fas fa-file-pdf"></i><span>Reports</span>
+            </a>
+        </div>
+        {% if session.get('role') == 'admin' %}
+        <div class="nav-section">
+            <span class="nav-section-label">Administration</span>
+            <a href="{{ url_for('main.manage_users') }}" class="nav-item {% if request.endpoint == 'main.manage_users' %}active{% endif %}">
+                <i class="fas fa-users-gear"></i><span>Users</span>
+            </a>
+        </div>
+        {% endif %}
+    </nav>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">{{ session.get('user_name', 'U')[0].upper() }}</div>
+            <div class="user-details">
+                <span class="user-name">{{ session.get('user_name', '') }}</span>
+                <span class="user-role badge-{{ session.get('role', 'user') }}">{{ session.get('role', '').upper() }}</span>
+            </div>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="logout-btn" title="Logout">
+            <i class="fas fa-right-from-bracket"></i>
+        </a>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<div class="main-content">
+    <header class="topbar">
+        <button class="sidebar-toggle" id="sidebarToggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="breadcrumb">
+            <i class="fas fa-shield-halved"></i>
+            {% block breadcrumb %}<span>Dashboard</span>{% endblock %}
+        </div>
+        <div class="topbar-right">
+            <div class="time-display" id="timeDisplay"></div>
+        </div>
+    </header>
+
+    <main class="page-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="alerts-container">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                <i class="fas fa-{% if category == 'success' %}circle-check{% elif category == 'danger' %}circle-exclamation{% elif category == 'warning' %}triangle-exclamation{% else %}circle-info{% endif %}"></i>
+                {{ message }}
+                <button class="alert-close" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+{% else %}
+{% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

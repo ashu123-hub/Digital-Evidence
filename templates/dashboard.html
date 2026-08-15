@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - DEMS{% endblock %}
+{% block breadcrumb %}<span>Dashboard</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">System Dashboard</h1>
+        <p class="page-subtitle">Real-time overview of digital evidence operations</p>
+    </div>
+    <div class="page-actions">
+        <a href="{{ url_for('cases.new_case') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Case
+        </a>
+        <a href="{{ url_for('evidence.upload_evidence') }}" class="btn btn-secondary">
+            <i class="fas fa-cloud-arrow-up"></i> Upload Evidence
+        </a>
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card stat-blue">
+        <div class="stat-icon"><i class="fas fa-folder-open"></i></div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.total_cases }}</div>
+            <div class="stat-label">Total Cases</div>
+        </div>
+        <div class="stat-bg-icon"><i class="fas fa-folder-open"></i></div>
+    </div>
+    <div class="stat-card stat-purple">
+        <div class="stat-icon"><i class="fas fa-file-shield"></i></div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.total_evidence }}</div>
+            <div class="stat-label">Total Evidence</div>
+        </div>
+        <div class="stat-bg-icon"><i class="fas fa-file-shield"></i></div>
+    </div>
+    <div class="stat-card stat-green">
+        <div class="stat-icon"><i class="fas fa-circle-check"></i></div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.verified_evidence }}</div>
+            <div class="stat-label">Verified</div>
+        </div>
+        <div class="stat-bg-icon"><i class="fas fa-circle-check"></i></div>
+    </div>
+    <div class="stat-card stat-yellow">
+        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.pending_evidence }}</div>
+            <div class="stat-label">Pending Verification</div>
+        </div>
+        <div class="stat-bg-icon"><i class="fas fa-clock"></i></div>
+    </div>
+    <div class="stat-card stat-red">
+        <div class="stat-icon"><i class="fas fa-triangle-exclamation"></i></div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.tampered_evidence }}</div>
+            <div class="stat-label">Tampering Alerts</div>
+        </div>
+        <div class="stat-bg-icon"><i class="fas fa-triangle-exclamation"></i></div>
+    </div>
+    <div class="stat-card stat-teal">
+        <div class="stat-icon"><i class="fas fa-users"></i></div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.total_users }}</div>
+            <div class="stat-label">System Users</div>
+        </div>
+        <div class="stat-bg-icon"><i class="fas fa-users"></i></div>
+    </div>
+</div>
+
+<!-- Content Grid -->
+<div class="content-grid">
+    <!-- Recent Cases -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-folder-open"></i> Recent Cases</h3>
+            <a href="{{ url_for('cases.list_cases') }}" class="btn btn-ghost btn-sm">View All</a>
+        </div>
+        <div class="card-body p-0">
+            {% if recent_cases %}
+            <table class="data-table">
+                <thead>
+                    <tr><th>Case ID</th><th>Title</th><th>Crime Type</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for c in recent_cases %}
+                    <tr>
+                        <td><a href="{{ url_for('cases.view_case', case_id=c.case_id) }}" class="link-primary">{{ c.case_id }}</a></td>
+                        <td>{{ c.case_title }}</td>
+                        <td><span class="badge badge-info">{{ c.crime_type }}</span></td>
+                        <td><span class="badge badge-{{ 'success' if c.status == 'active' else 'secondary' }}">{{ c.status.upper() }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state"><i class="fas fa-folder-open"></i><p>No cases yet</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Evidence -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-file-shield"></i> Recent Evidence</h3>
+            <a href="{{ url_for('evidence.list_evidence') }}" class="btn btn-ghost btn-sm">View All</a>
+        </div>
+        <div class="card-body p-0">
+            {% if recent_evidence %}
+            <table class="data-table">
+                <thead>
+                    <tr><th>Evidence ID</th><th>File</th><th>Case</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for e in recent_evidence %}
+                    <tr>
+                        <td><a href="{{ url_for('evidence.view_evidence', evidence_id=e.evidence_id) }}" class="link-primary">{{ e.evidence_id }}</a></td>
+                        <td class="mono text-sm">{{ e.file_name[:20] }}{% if e.file_name|length > 20 %}...{% endif %}</td>
+                        <td>{{ e.case_id }}</td>
+                        <td>
+                            <span class="badge badge-{{ 'success' if e.status == 'verified' else ('danger' if e.status == 'tampered' else 'warning') }}">
+                                {{ e.status.replace('_', ' ').upper() }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state"><i class="fas fa-file-shield"></i><p>No evidence uploaded yet</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Audit Logs -->
+    <div class="card span-full">
+        <div class="card-header">
+            <h3><i class="fas fa-clipboard-list"></i> Recent Activity</h3>
+            <a href="{{ url_for('main.audit_logs') }}" class="btn btn-ghost btn-sm">View All Logs</a>
+        </div>
+        <div class="card-body p-0">
+            {% if recent_logs %}
+            <table class="data-table">
+                <thead>
+                    <tr><th>Time</th><th>User</th><th>Action</th><th>Evidence</th><th>Status</th><th>IP</th></tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_logs %}
+                    <tr>
+                        <td class="mono text-sm">{{ log.timestamp | datefmt }}</td>
+                        <td>{{ log.user_name or '-' }}</td>
+                        <td>
+                            <span class="action-badge action-{{ log.action.lower().replace('_', '-') }}">
+                                {{ log.action }}
+                            </span>
+                        </td>
+                        <td class="mono text-sm">{{ log.evidence_id or '-' }}</td>
+                        <td><span class="badge badge-{{ 'success' if log.status == 'SUCCESS' else ('danger' if log.status in ['FAILED', 'ALERT'] else 'secondary') }}">{{ log.status }}</span></td>
+                        <td class="mono text-sm">{{ log.ip_address or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state"><i class="fas fa-clipboard-list"></i><p>No activity yet</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Register - DEMS{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+
+{% block auth_content %}
+<div class="auth-wrapper">
+    <div class="auth-left">
+        <div class="auth-branding">
+            <div class="auth-logo"><i class="fas fa-shield-halved"></i></div>
+            <h1>DEMS</h1>
+            <p>Digital Evidence Management System</p>
+        </div>
+    </div>
+    <div class="auth-right">
+        <div class="auth-card">
+            <div class="auth-card-header">
+                <h2>Create Account</h2>
+                <p>Register a new system user</p>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}{% endif %}{% endwith %}
+            <form method="POST" action="{{ url_for('auth.register') }}" class="auth-form">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="role">Role</label>
+                    <select id="role" name="role" class="form-control">
+                        <option value="investigator">Investigator</option>
+                        <option value="analyst">Forensic Analyst</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Register User</button>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-ghost btn-full" style="text-align:center;margin-top:0.5rem">Back to Login</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

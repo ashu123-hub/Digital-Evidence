@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ ev.evidence_id }} - DEMS{% endblock %}
+{% block breadcrumb %}<span><a href="{{ url_for('evidence.list_evidence') }}">Evidence</a></span><span>/</span><span>{{ ev.evidence_id }}</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ ev.evidence_id }}</h1>
+        <p class="page-subtitle">{{ ev.file_name }} &nbsp;|&nbsp; {{ ev.file_type }}</p>
+    </div>
+    <div class="page-actions">
+        <a href="{{ url_for('verification.verify_evidence', evidence_id=ev.evidence_id) }}" class="btn btn-primary">
+            <i class="fas fa-fingerprint"></i> Verify Integrity
+        </a>
+        <a href="{{ url_for('evidence.download_evidence', evidence_id=ev.evidence_id) }}" class="btn btn-secondary">
+            <i class="fas fa-download"></i> Download (Decrypted)
+        </a>
+    </div>
+</div>
+
+<div class="detail-layout">
+    <div class="detail-left">
+        <!-- Evidence Details -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-file-shield"></i> Evidence Details</h3></div>
+            <div class="card-body">
+                <div class="detail-row"><span class="detail-label">Evidence ID</span><span class="detail-value mono">{{ ev.evidence_id }}</span></div>
+                <div class="detail-row"><span class="detail-label">Case ID</span>
+                    <span class="detail-value">
+                        <a href="{{ url_for('cases.view_case', case_id=ev.case_id) }}" class="link-primary mono">{{ ev.case_id }}</a>
+                    </span>
+                </div>
+                <div class="detail-row"><span class="detail-label">File Name</span><span class="detail-value">{{ ev.file_name }}</span></div>
+                <div class="detail-row"><span class="detail-label">File Type</span><span class="detail-value"><span class="badge badge-info">{{ ev.file_type }}</span></span></div>
+                <div class="detail-row"><span class="detail-label">File Size</span><span class="detail-value">{{ ev.file_size | filesizefmt }}</span></div>
+                <div class="detail-row"><span class="detail-label">Encrypted</span>
+                    <span class="detail-value">
+                        {% if ev.encrypted %}<span class="badge badge-success"><i class="fas fa-lock"></i> AES-256</span>{% else %}<span class="badge badge-warning">No</span>{% endif %}
+                    </span>
+                </div>
+                <div class="detail-row"><span class="detail-label">Uploaded By</span><span class="detail-value">{{ ev.uploaded_by_name }}</span></div>
+                <div class="detail-row"><span class="detail-label">Uploaded At</span><span class="detail-value mono">{{ ev.uploaded_at | datefmt }}</span></div>
+                <div class="detail-row"><span class="detail-label">Status</span>
+                    <span class="detail-value">
+                        <span class="badge badge-{{ 'success' if ev.status == 'verified' else ('danger' if ev.status == 'tampered' else 'warning') }}">
+                            {{ ev.status.replace('_',' ').upper() }}
+                        </span>
+                    </span>
+                </div>
+                {% if ev.remarks %}
+                <div class="detail-row stacked"><span class="detail-label">Remarks</span><span class="detail-value text-muted">{{ ev.remarks }}</span></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- SHA-256 Hash -->
+        <div class="card hash-card">
+            <div class="card-header">
+                <h3><i class="fas fa-fingerprint"></i> SHA-256 Integrity Hash</h3>
+                <button class="btn btn-ghost btn-sm" onclick="copyHash()"><i class="fas fa-copy"></i> Copy</button>
+            </div>
+            <div class="card-body">
+                <div class="hash-display" id="hashValue">{{ ev.sha256_hash or 'Not computed' }}</div>
+                <p class="text-muted text-sm" style="margin-top:0.5rem">This hash uniquely identifies the evidence. Any modification will produce a completely different hash.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-right">
+        <!-- Chain of Custody -->
+        <div class="card">
+            <div class="card-header"><h3><i class="fas fa-link"></i> Chain of Custody ({{ custody_chain|length }} records)</h3></div>
+            <div class="card-body p-0">
+                {% if custody_chain %}
+                <div class="custody-timeline">
+                    {% for i, entry in custody_chain | enumerate %}
+                    <div class="timeline-item {{ 'first' if loop.first else '' }}">
+                        <div class="timeline-marker">
+                            <i class="fas fa-{{ 'upload' if entry.action == 'UPLOADED' else ('eye' if entry.action == 'VIEWED' else ('check' if 'VERIF' in entry.action else ('download' if entry.action == 'DOWNLOADED' else 'circle-dot'))) }}"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="timeline-header">
+                                <span class="timeline-action {{ 'action-danger' if 'TAMPER' in entry.action else '' }}">{{ entry.action }}</span>
+                                <span class="timeline-time">{{ entry.timestamp | datefmt }}</span>
+                            </div>
+                            <div class="timeline-user"><i class="fas fa-user"></i> {{ entry.user_name }}</div>
+                            <div class="timeline-hash">
+                                <span class="hash-label">Record Hash:</span>
+                                <span class="hash-mini mono">{{ entry.record_hash[:20] }}...</span>
+                            </div>
+                            {% if entry.remarks %}
+                            <div class="timeline-remarks text-muted">{{ entry.remarks }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><i class="fas fa-link"></i><p>No custody records</p></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyHash() {
+    const hash = document.getElementById('hashValue').textContent;
+    navigator.clipboard.writeText(hash).then(() => {
+        showToast('Hash copied to clipboard!', 'success');
+    });
+}
+</script>
+{% endblock %}

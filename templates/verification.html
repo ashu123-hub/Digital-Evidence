@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Verify Evidence - DEMS{% endblock %}
+{% block breadcrumb %}<span><a href="{{ url_for('evidence.list_evidence') }}">Evidence</a></span><span>/</span><span><a href="{{ url_for('evidence.view_evidence', evidence_id=ev.evidence_id) }}">{{ ev.evidence_id }}</a></span><span>/</span><span>Verify</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Evidence Integrity Verification</h1>
+        <p class="page-subtitle">{{ ev.evidence_id }} — {{ ev.file_name }}</p>
+    </div>
+</div>
+
+<div class="verify-layout">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-fingerprint"></i> Verification Engine</h3></div>
+        <div class="card-body">
+            <div class="verify-info">
+                <div class="verify-detail">
+                    <span class="detail-label">Evidence ID</span>
+                    <span class="detail-value mono">{{ ev.evidence_id }}</span>
+                </div>
+                <div class="verify-detail">
+                    <span class="detail-label">File Name</span>
+                    <span class="detail-value">{{ ev.file_name }}</span>
+                </div>
+                <div class="verify-detail">
+                    <span class="detail-label">Stored SHA-256 Hash</span>
+                    <span class="detail-value mono hash-display-sm">{{ ev.sha256_hash or 'N/A' }}</span>
+                </div>
+                <div class="verify-detail">
+                    <span class="detail-label">Current Status</span>
+                    <span class="detail-value">
+                        <span class="badge badge-{{ 'success' if ev.status == 'verified' else ('danger' if ev.status == 'tampered' else 'warning') }}">
+                            {{ ev.status.replace('_', ' ').upper() }}
+                        </span>
+                    </span>
+                </div>
+            </div>
+
+            <div class="verify-process-info">
+                <h4><i class="fas fa-info-circle"></i> How Verification Works</h4>
+                <ol class="process-list">
+                    <li>System decrypts the stored AES-256 encrypted file</li>
+                    <li>Calculates a fresh SHA-256 hash of the decrypted content</li>
+                    <li>Compares against the original stored hash</li>
+                    <li>Reports VERIFIED or TAMPERING DETECTED</li>
+                    <li>Records result in audit log and chain of custody</li>
+                </ol>
+            </div>
+
+            <form method="POST" action="{{ url_for('verification.verify_evidence', evidence_id=ev.evidence_id) }}" id="verifyForm">
+                <button type="submit" class="btn btn-primary btn-verify" id="verifyBtn">
+                    <i class="fas fa-fingerprint"></i> Run Integrity Verification
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if result %}
+    <div class="card verify-result-card {{ 'verified-card' if result.verified else 'tampered-card' }}">
+        <div class="card-header">
+            <h3>
+                {% if result.verified %}
+                <i class="fas fa-circle-check text-success"></i> VERIFICATION RESULT
+                {% else %}
+                <i class="fas fa-circle-exclamation text-danger"></i> VERIFICATION RESULT
+                {% endif %}
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="result-banner {{ 'result-verified' if result.verified else 'result-tampered' }}">
+                {% if result.verified %}
+                <i class="fas fa-shield-check result-icon"></i>
+                <div class="result-text">
+                    <h2>✓ EVIDENCE VERIFIED</h2>
+                    <p>Evidence integrity is maintained. No tampering detected.</p>
+                </div>
+                {% else %}
+                <i class="fas fa-shield-exclamation result-icon"></i>
+                <div class="result-text">
+                    <h2>⚠ TAMPERING DETECTED</h2>
+                    <p>Hash mismatch! Evidence may have been modified.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="hash-comparison">
+                <div class="hash-block">
+                    <label>Stored SHA-256 Hash</label>
+                    <div class="hash-value mono {{ 'hash-match' if result.verified else 'hash-mismatch' }}">{{ result.stored_hash }}</div>
+                </div>
+                <div class="hash-vs">
+                    <i class="fas fa-equals {{ 'text-success' if result.verified else 'text-danger' }}"></i>
+                </div>
+                <div class="hash-block">
+                    <label>Current SHA-256 Hash</label>
+                    <div class="hash-value mono {{ 'hash-match' if result.verified else 'hash-mismatch' }}">{{ result.current_hash }}</div>
+                </div>
+            </div>
+
+            <div class="result-meta">
+                <i class="fas fa-clock"></i> Verified at {{ result.timestamp }}
+                &nbsp;&nbsp;|&nbsp;&nbsp;
+                <i class="fas fa-user"></i> By {{ session.get('user_name') }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('verifyForm').addEventListener('submit', function() {
+    document.getElementById('verifyBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+    document.getElementById('verifyBtn').disabled = true;
+});
+</script>
+{% endblock %}

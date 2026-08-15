@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Users - DEMS{% endblock %}
+{% block breadcrumb %}<span>Administration</span><span>/</span><span>Users</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">System Users</h1>
+        <p class="page-subtitle">{{ users|length }} registered users</p>
+    </div>
+    <a href="{{ url_for('auth.register') }}" class="btn btn-primary"><i class="fas fa-user-plus"></i> Add User</a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <table class="data-table">
+            <thead>
+                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:0.75rem">
+                            <div class="user-avatar-sm">{{ u.name[0].upper() }}</div>
+                            <strong>{{ u.name }}</strong>
+                        </div>
+                    </td>
+                    <td class="mono">{{ u.email }}</td>
+                    <td><span class="badge badge-{{ 'danger' if u.role == 'admin' else ('primary' if u.role == 'investigator' else 'info') }}">{{ u.role.upper() }}</span></td>
+                    <td><span class="badge badge-{{ 'success' if u.status == 'active' else 'secondary' }}">{{ u.status.upper() }}</span></td>
+                    <td>{{ u.created_at | datefmt }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

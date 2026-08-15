@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs - DEMS{% endblock %}
+{% block breadcrumb %}<span>Audit Logs</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Audit Logs</h1>
+        <p class="page-subtitle">{{ total }} total log entries</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Evidence ID</th>
+                    <th>IP Address</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr class="{{ 'row-alert' if log.status in ['FAILED','ALERT'] else '' }}">
+                    <td class="mono text-sm">{{ log.timestamp | datefmt('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>{{ log.user_name or log.user_id or '-' }}</td>
+                    <td>
+                        <span class="action-badge action-{{ log.action.lower().replace('_', '-') }}">
+                            {{ log.action }}
+                        </span>
+                    </td>
+                    <td class="mono text-sm">{{ log.evidence_id or '-' }}</td>
+                    <td class="mono text-sm">{{ log.ip_address or '-' }}</td>
+                    <td>
+                        <span class="badge badge-{{ 'success' if log.status == 'SUCCESS' else ('danger' if log.status in ['FAILED', 'ALERT'] else 'secondary') }}">
+                            {{ log.status }}
+                        </span>
+                    </td>
+                    <td class="text-sm text-muted">{{ log.details or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div class="pagination">
+    {% if page > 1 %}
+    <a href="{{ url_for('main.audit_logs') }}?page={{ page - 1 }}" class="btn btn-ghost btn-sm"><i class="fas fa-chevron-left"></i> Previous</a>
+    {% endif %}
+    <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a href="{{ url_for('main.audit_logs') }}?page={{ page + 1 }}" class="btn btn-ghost btn-sm">Next <i class="fas fa-chevron-right"></i></a>
+    {% endif %}
+</div>
+{% endblock %}

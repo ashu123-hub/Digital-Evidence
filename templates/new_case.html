@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}New Case - DEMS{% endblock %}
+{% block breadcrumb %}<span><a href="{{ url_for('cases.list_cases') }}">Cases</a></span><span>/</span><span>New Case</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Create New Case</h1>
+        <p class="page-subtitle">Open a new cybercrime investigation case</p>
+    </div>
+</div>
+
+<div class="card form-card">
+    <div class="card-header">
+        <h3><i class="fas fa-folder-plus"></i> Case Information</h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('cases.new_case') }}" class="form-grid">
+            <div class="form-group span-2">
+                <label for="case_title"><i class="fas fa-heading"></i> Case Title *</label>
+                <input type="text" id="case_title" name="case_title" class="form-control" placeholder="e.g. Phishing Attack Investigation 2026" required>
+            </div>
+            <div class="form-group">
+                <label for="crime_type"><i class="fas fa-triangle-exclamation"></i> Crime Type *</label>
+                <select id="crime_type" name="crime_type" class="form-control" required>
+                    <option value="">-- Select Crime Type --</option>
+                    <option>Phishing</option>
+                    <option>Ransomware</option>
+                    <option>Data Theft</option>
+                    <option>Unauthorized Access</option>
+                    <option>Malware</option>
+                    <option>Email Spoofing</option>
+                    <option>Social Engineering</option>
+                    <option>Cyber Fraud</option>
+                    <option>Identity Theft</option>
+                    <option>DDOS Attack</option>
+                    <option>Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-user-tie"></i> Assigned Investigator</label>
+                <input type="text" class="form-control" value="{{ session.get('user_name') }}" disabled>
+            </div>
+            <div class="form-group span-2">
+                <label for="description"><i class="fas fa-align-left"></i> Case Description</label>
+                <textarea id="description" name="description" class="form-control" rows="4" placeholder="Describe the nature of the cybercrime, initial findings, and investigation scope..."></textarea>
+            </div>
+            <div class="form-actions span-2">
+                <a href="{{ url_for('cases.list_cases') }}" class="btn btn-ghost">Cancel</a>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-folder-plus"></i> Create Case</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

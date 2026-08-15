@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Reports - DEMS{% endblock %}
+{% block breadcrumb %}<span>Reports</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Forensic Reports</h1>
+        <p class="page-subtitle">Generate PDF reports for investigation cases</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if cases %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Case ID</th>
+                    <th>Title</th>
+                    <th>Crime Type</th>
+                    <th>Evidence Items</th>
+                    <th>Investigator</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in cases %}
+                <tr>
+                    <td class="mono">{{ c.case_id }}</td>
+                    <td><strong>{{ c.case_title }}</strong></td>
+                    <td><span class="badge badge-info">{{ c.crime_type }}</span></td>
+                    <td><span class="badge badge-secondary">{{ c.evidence_count }} items</span></td>
+                    <td>{{ c.investigator_name }}</td>
+                    <td><span class="badge badge-{{ 'success' if c.status == 'active' else 'secondary' }}">{{ c.status.upper() }}</span></td>
+                    <td>
+                        <a href="{{ url_for('reports.generate_report', case_id=c.case_id) }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-file-pdf"></i> Generate PDF
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-file-pdf"></i>
+            <h3>No Cases</h3>
+            <p>Create a case to generate reports.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

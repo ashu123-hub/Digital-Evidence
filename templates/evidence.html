@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Evidence - DEMS{% endblock %}
+{% block breadcrumb %}<span>Evidence</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Evidence Repository</h1>
+        <p class="page-subtitle">{{ evidence_list|length }} evidence item(s)</p>
+    </div>
+    <a href="{{ url_for('evidence.upload_evidence') }}" class="btn btn-primary">
+        <i class="fas fa-cloud-arrow-up"></i> Upload Evidence
+    </a>
+</div>
+
+<!-- Search Bar -->
+<div class="card filter-card">
+    <div class="card-body">
+        <form method="GET" class="filter-form">
+            <div class="form-group">
+                <label>Search</label>
+                <input type="text" name="search" class="form-control" placeholder="Evidence ID, file name..." value="{{ search }}">
+            </div>
+            <div class="form-group">
+                <label>Filter by Case</label>
+                <select name="case_id" class="form-control">
+                    <option value="">All Cases</option>
+                    {% for c in cases %}
+                    <option value="{{ c.case_id }}" {% if c.case_id == case_filter %}selected{% endif %}>{{ c.case_id }} - {{ c.case_title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select name="status" class="form-control">
+                    <option value="">All Statuses</option>
+                    <option value="pending_verification" {% if status_filter == 'pending_verification' %}selected{% endif %}>Pending</option>
+                    <option value="verified" {% if status_filter == 'verified' %}selected{% endif %}>Verified</option>
+                    <option value="tampered" {% if status_filter == 'tampered' %}selected{% endif %}>Tampered</option>
+                </select>
+            </div>
+            <div class="form-group align-end">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+                <a href="{{ url_for('evidence.list_evidence') }}" class="btn btn-ghost">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if evidence_list %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Evidence ID</th>
+                    <th>File Name</th>
+                    <th>Type</th>
+                    <th>Case</th>
+                    <th>SHA-256 (Preview)</th>
+                    <th>Encrypted</th>
+                    <th>Uploaded By</th>
+                    <th>Uploaded At</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in evidence_list %}
+                <tr>
+                    <td class="mono font-semibold">
+                        <a href="{{ url_for('evidence.view_evidence', evidence_id=e.evidence_id) }}" class="link-primary">{{ e.evidence_id }}</a>
+                    </td>
+                    <td>{{ e.file_name }}</td>
+                    <td><span class="badge badge-secondary">{{ e.file_type }}</span></td>
+                    <td class="mono">{{ e.case_id }}</td>
+                    <td class="mono text-sm hash-cell" title="{{ e.sha256_hash }}">{{ e.sha256_hash[:16] if e.sha256_hash else '-' }}...</td>
+                    <td>
+                        {% if e.encrypted %}
+                        <span class="badge badge-success"><i class="fas fa-lock"></i> AES-256</span>
+                        {% else %}
+                        <span class="badge badge-warning">No</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ e.uploaded_by_name }}</td>
+                    <td class="text-sm">{{ e.uploaded_at | datefmt }}</td>
+                    <td>
+                        <span class="badge badge-{{ 'success' if e.status == 'verified' else ('danger' if e.status == 'tampered' else 'warning') }}">
+                            {{ e.status.replace('_', ' ').upper() }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="{{ url_for('evidence.view_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm" title="View"><i class="fas fa-eye"></i></a>
+                            <a href="{{ url_for('verification.verify_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm" title="Verify"><i class="fas fa-fingerprint"></i></a>
+                            <a href="{{ url_for('evidence.download_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm" title="Download"><i class="fas fa-download"></i></a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-file-circle-question"></i>
+            <h3>No Evidence Found</h3>
+            <p>No evidence matches your search criteria.</p>
+            <a href="{{ url_for('evidence.upload_evidence') }}" class="btn btn-primary"><i class="fas fa-cloud-arrow-up"></i> Upload Evidence</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

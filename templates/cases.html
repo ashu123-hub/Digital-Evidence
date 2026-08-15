@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Cases - DEMS{% endblock %}
+{% block breadcrumb %}<span>Cases</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Investigation Cases</h1>
+        <p class="page-subtitle">{{ cases|length }} case(s) found</p>
+    </div>
+    {% if session.get('role') in ['admin', 'investigator'] %}
+    <a href="{{ url_for('cases.new_case') }}" class="btn btn-primary"><i class="fas fa-plus"></i> New Case</a>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if cases %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Case ID</th>
+                    <th>Case Number</th>
+                    <th>Title</th>
+                    <th>Crime Type</th>
+                    <th>Investigator</th>
+                    <th>Evidence</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in cases %}
+                <tr>
+                    <td class="mono font-semibold">{{ c.case_id }}</td>
+                    <td class="mono text-sm">{{ c.case_number }}</td>
+                    <td><strong>{{ c.case_title }}</strong></td>
+                    <td><span class="badge badge-info">{{ c.crime_type }}</span></td>
+                    <td>{{ c.investigator_name }}</td>
+                    <td><span class="badge badge-secondary">{{ c.evidence_count }} item(s)</span></td>
+                    <td><span class="badge badge-{{ 'success' if c.status == 'active' else 'secondary' }}">{{ c.status.upper() }}</span></td>
+                    <td class="text-sm">{{ c.created_at | datefmt }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="{{ url_for('cases.view_case', case_id=c.case_id) }}" class="btn btn-ghost btn-sm" title="View">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{{ url_for('evidence.upload_evidence') }}?case_id={{ c.case_id }}" class="btn btn-ghost btn-sm" title="Upload Evidence">
+                                <i class="fas fa-cloud-arrow-up"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-folder-open"></i>
+            <h3>No Cases Found</h3>
+            <p>Start by creating a new investigation case.</p>
+            {% if session.get('role') in ['admin', 'investigator'] %}
+            <a href="{{ url_for('cases.new_case') }}" class="btn btn-primary"><i class="fas fa-plus"></i> Create First Case</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

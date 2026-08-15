@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Case {{ case.case_id }} - DEMS{% endblock %}
+{% block breadcrumb %}<span><a href="{{ url_for('cases.list_cases') }}">Cases</a></span><span>/</span><span>{{ case.case_id }}</span>{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ case.case_title }}</h1>
+        <p class="page-subtitle">{{ case.case_number }} &nbsp;|&nbsp; {{ case.crime_type }}</p>
+    </div>
+    <div class="page-actions">
+        <a href="{{ url_for('evidence.upload_evidence') }}?case_id={{ case.case_id }}" class="btn btn-primary">
+            <i class="fas fa-cloud-arrow-up"></i> Upload Evidence
+        </a>
+        {% if case.status == 'active' and session.get('role') in ['admin','investigator'] %}
+        <form method="POST" action="{{ url_for('cases.close_case', case_id=case.case_id) }}" style="display:inline">
+            <button type="submit" class="btn btn-ghost" onclick="return confirm('Close this case?')">
+                <i class="fas fa-folder-minus"></i> Close Case
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="detail-grid">
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-info-circle"></i> Case Details</h3></div>
+        <div class="card-body">
+            <div class="detail-row"><span class="detail-label">Case ID</span><span class="detail-value mono">{{ case.case_id }}</span></div>
+            <div class="detail-row"><span class="detail-label">Case Number</span><span class="detail-value mono">{{ case.case_number }}</span></div>
+            <div class="detail-row"><span class="detail-label">Crime Type</span><span class="detail-value"><span class="badge badge-info">{{ case.crime_type }}</span></span></div>
+            <div class="detail-row"><span class="detail-label">Investigator</span><span class="detail-value">{{ case.investigator_name }}</span></div>
+            <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value"><span class="badge badge-{{ 'success' if case.status == 'active' else 'secondary' }}">{{ case.status.upper() }}</span></span></div>
+            <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">{{ case.created_at | datefmt }}</span></div>
+            {% if case.description %}
+            <div class="detail-row stacked"><span class="detail-label">Description</span><span class="detail-value text-muted">{{ case.description }}</span></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-file-shield"></i> Evidence ({{ evidence_list|length }})</h3>
+        </div>
+        <div class="card-body p-0">
+            {% if evidence_list %}
+            <table class="data-table">
+                <thead><tr><th>Evidence ID</th><th>File Name</th><th>Type</th><th>Hash (Preview)</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                    {% for e in evidence_list %}
+                    <tr>
+                        <td class="mono">{{ e.evidence_id }}</td>
+                        <td>{{ e.file_name }}</td>
+                        <td>{{ e.file_type }}</td>
+                        <td class="mono text-sm hash-cell">{{ e.sha256_hash[:12] if e.sha256_hash else '-' }}...</td>
+                        <td><span class="badge badge-{{ 'success' if e.status == 'verified' else ('danger' if e.status == 'tampered' else 'warning') }}">{{ e.status.replace('_',' ').upper() }}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{{ url_for('evidence.view_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm"><i class="fas fa-eye"></i></a>
+                                <a href="{{ url_for('verification.verify_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm" title="Verify"><i class="fas fa-fingerprint"></i></a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-file-circle-plus"></i>
+                <p>No evidence uploaded yet</p>
+                <a href="{{ url_for('evidence.upload_evidence') }}?case_id={{ case.case_id }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Upload Evidence</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
