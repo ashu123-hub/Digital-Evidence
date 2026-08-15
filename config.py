@@ -4,9 +4,10 @@ import secrets
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
     MONGO_URI = os.environ.get('MONGO_URI') or 'mongodb://localhost:27017/dems_db'
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
-    ENCRYPTED_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'encrypted_evidence')
-    REPORTS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
+    is_vercel = os.environ.get('VERCEL') is not None
+    UPLOAD_FOLDER = os.path.join('/tmp', 'uploads') if is_vercel else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    ENCRYPTED_FOLDER = os.path.join('/tmp', 'encrypted_evidence') if is_vercel else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'encrypted_evidence')
+    REPORTS_FOLDER = os.path.join('/tmp', 'reports') if is_vercel else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
 
     ALLOWED_EXTENSIONS = {
