@@ -90,3 +90,56 @@ def close_case(case_id):
     db.cases.update_one({'case_id': case_id}, {'$set': {'status': 'closed', 'updated_at': datetime.utcnow()}})
     flash('Case closed.', 'info')
     return redirect(url_for('cases.view_case', case_id=case_id))
+
+@cases_bp.route('/cases/<case_id>/delete', methods=['POST'])
+@login_required
+@role_required('admin')
+def delete_case(case_id):
+    db = get_db()
+    case = db.cases.find_one({'case_id': case_id})
+    if not case:
+        flash('Case not found.', 'danger')
+        return redirect(url_for('cases.list_cases'))
+
+    # Delete all associated evidence files and records
+    import os
+    from config import Config
+    evidence_list = list(db.evidence.find({'case_id': case_id}))
+    for ev in evidence_list:
+        # Remove encrypted file
+        enc_path = os.path.join(Config.ENCRYPTED_FOLDER, ev.get('encrypted_file', ''))
+        if ev.get('encrypted_file') and os.path.exists(enc_path):
+            try:
+                os.remove(enc_path)
+            except Exception:
+                pass
+        # Remove original uploaded file (if still present)
+        orig_path = os.path.join(Config.UPLOAD_FOLDER, ev.get('file_name', ''))
+        if ev.get('file_name') and os.path.exists(orig_path):
+            try:
+                os.remove(orig_path)
+            except Exception:
+                pass
+        # Remove chain of custody records for each evidence
+        db.chain_of_custody.delete_many({'evidence_id': ev.get('evidence_id')})
+
+    # Delete all evidence records for this case
+    db.evidence.delete_many({'case_id': case_id})
+
+    # Audit log
+    db.audit_logs.insert_one({
+        'user_id': session['user_id'],
+        'user_name': session['user_name'],
+        'evidence_id': None,
+        'action': 'CASE_DELETED',
+        'ip_address': request.remote_addr,
+        'timestamp': datetime.utcnow(),
+        'status': 'SUCCESS',
+        'details': f"Case {case_id} permanently deleted with {len(evidence_list)} evidence item(s)"
+    })
+
+    # Delete the case itself
+    db.cases.delete_one({'case_id': case_id})
+
+    flash(f'Case {case_id} and all associated evidence permanently deleted.', 'danger')
+    return redirect(url_for('cases.list_cases'))

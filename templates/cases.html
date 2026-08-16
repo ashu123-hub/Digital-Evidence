@@ -49,6 +49,12 @@
                             <a href="{{ url_for('evidence.upload_evidence') }}?case_id={{ c.case_id }}" class="btn btn-ghost btn-sm" title="Upload Evidence">
                                 <i class="fas fa-cloud-arrow-up"></i>
                             </a>
+                            {% if session.get('role') == 'admin' %}
+                            <button type="button" class="btn btn-danger btn-sm" title="Delete Case"
+                                onclick="confirmDeleteCase('{{ c.case_id }}', '{{ c.case_title|e }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -67,4 +73,29 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Delete Case Confirmation Modal -->
+<div id="deleteCaseModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:450px;width:90%;">
+        <h3 style="color:var(--danger,#ef4444);margin-bottom:0.5rem;"><i class="fas fa-triangle-exclamation"></i> Delete Case</h3>
+        <p style="margin-bottom:0.25rem;">You are about to permanently delete:</p>
+        <p><strong id="deleteCaseTitle" style="color:var(--text-primary);"></strong></p>
+        <p class="text-danger" style="margin-bottom:1.5rem;"><i class="fas fa-circle-exclamation"></i> This will also delete ALL evidence files linked to this case. This cannot be undone.</p>
+        <form id="deleteCaseForm" method="POST">
+            <div style="display:flex;gap:1rem;justify-content:flex-end;">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('deleteCaseModal').style.display='none'">Cancel</button>
+                <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Delete Permanently</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+function confirmDeleteCase(caseId, caseTitle) {
+    document.getElementById('deleteCaseTitle').textContent = caseTitle + ' (' + caseId + ')';
+    document.getElementById('deleteCaseForm').action = '/cases/' + caseId + '/delete';
+    document.getElementById('deleteCaseModal').style.display = 'flex';
+}
+</script>
 {% endblock %}
