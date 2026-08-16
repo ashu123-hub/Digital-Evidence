@@ -21,9 +21,11 @@ def create_app():
     os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(Config.ENCRYPTED_FOLDER, exist_ok=True)
     os.makedirs(Config.REPORTS_FOLDER, exist_ok=True)
-    session_dir = '/tmp/flask_session' if os.environ.get('VERCEL') else 'flask_session'
-    os.makedirs(session_dir, exist_ok=True)
-    app.config['SESSION_FILE_DIR'] = session_dir
+    # Only set up filesystem sessions when NOT on Vercel (Vercel uses cookie sessions)
+    if not os.environ.get('VERCEL'):
+        session_dir = 'flask_session'
+        os.makedirs(session_dir, exist_ok=True)
+        app.config['SESSION_FILE_DIR'] = session_dir
 
     # Initialize MongoDB
     db = init_db(app)
