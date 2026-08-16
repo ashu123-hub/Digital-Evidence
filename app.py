@@ -25,11 +25,6 @@ def create_app():
     except OSError:
         pass  # Read-only filesystem — ok for Vercel
 
-    # Only set up filesystem sessions when NOT on Vercel (Vercel uses cookie sessions)
-    if not os.environ.get('VERCEL'):
-        session_dir = 'flask_session'
-        os.makedirs(session_dir, exist_ok=True)
-        app.config['SESSION_FILE_DIR'] = session_dir
 
     # Initialize MongoDB connection
     db = init_db(app)
