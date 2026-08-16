@@ -5,7 +5,9 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
     MONGO_URI = os.environ.get('MONGO_URI') or 'mongodb://localhost:27017/dems_db'
 
-    _base = os.path.dirname(os.path.abspath(__file__))
+    # On Vercel serverless, only /tmp is writable — use it for all file paths
+    _on_vercel = os.environ.get('VERCEL') is not None
+    _base = '/tmp' if _on_vercel else os.path.dirname(os.path.abspath(__file__))
     UPLOAD_FOLDER = os.path.join(_base, 'uploads')
     ENCRYPTED_FOLDER = os.path.join(_base, 'encrypted_evidence')
     REPORTS_FOLDER = os.path.join(_base, 'reports')
