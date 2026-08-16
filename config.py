@@ -2,7 +2,8 @@ import os
 import secrets
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+    # IMPORTANT: Set SECRET_KEY env var in Vercel! Without it sessions break on cold starts.
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dems-super-secret-key-2026-forensics-stable'
     MONGO_URI = os.environ.get('MONGO_URI') or 'mongodb://localhost:27017/dems_db'
 
     # On Vercel serverless, only /tmp is writable — use it for all file paths

@@ -49,6 +49,7 @@
         </div>
         <div class="card-body p-0">
             {% if evidence_list %}
+            <div style="overflow-x:auto;">
             <table class="data-table">
                 <thead><tr><th>Evidence ID</th><th>File Name</th><th>Type</th><th>Hash (Preview)</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
@@ -69,6 +70,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% else %}
             <div class="empty-state">
                 <i class="fas fa-file-circle-plus"></i>
