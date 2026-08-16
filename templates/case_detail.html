@@ -81,7 +81,7 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
+{% block extra_scripts %}
 {% if session.get('role') == 'admin' %}
 <div id="deleteCaseModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:450px;width:90%;">
