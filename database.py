@@ -2,6 +2,7 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from config import Config
 import logging
+import os
 
 client = None
 db = None
@@ -10,13 +11,24 @@ def init_db(app):
     global client, db
     uri = Config.MONGO_URI
     try:
-        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        # On Vercel (serverless), use TLS with relaxed cert validation
+        # and a longer timeout since cold starts take more time
+        is_atlas = 'mongodb+srv' in uri or 'mongodb.net' in uri
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=15000,
+            connectTimeoutMS=15000,
+            socketTimeoutMS=30000,
+            tls=is_atlas,
+            tlsAllowInvalidCertificates=False,
+            retryWrites=True,
+        )
         # Handle database name extraction safely
         try:
             db = client.get_database()
         except Exception:
             db = client['dems_db']
-            
+
         if db is None or db.name == 'admin':
             db = client['dems_db']
 
@@ -32,7 +44,7 @@ def init_db(app):
 
     except Exception as e:
         logging.error(f"MongoDB connection initialization warning: {e}")
-        
+
     return db
 
 def get_db():

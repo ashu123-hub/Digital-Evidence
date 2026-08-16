@@ -29,6 +29,9 @@ class Config:
     AES_KEY = AES_KEY if isinstance(AES_KEY, bytes) else AES_KEY.encode()[:32]
     AES_KEY = AES_KEY.ljust(32, b'0')[:32]
 
-    SESSION_TYPE = 'filesystem'
+    # On Vercel: use cookie-based sessions (no writable filesystem for session files)
+    # Locally: use filesystem sessions
+    _on_vercel = os.environ.get('VERCEL') is not None
+    SESSION_TYPE = 'null' if _on_vercel else 'filesystem'
     SESSION_PERMANENT = False
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
