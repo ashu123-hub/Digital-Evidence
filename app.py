@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file for local development
 from flask import Flask, redirect, url_for
 from config import Config
 from database import init_db
