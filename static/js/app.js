@@ -15,9 +15,9 @@ function showToast(msg, type='success') {
     setTimeout(() => t.remove(), 3000);
 }
 
-// Auto-dismiss alerts
+// Auto-dismiss top flash alerts
 setTimeout(() => {
-    document.querySelectorAll('.alert').forEach(a => {
+    document.querySelectorAll('.alerts-container .alert').forEach(a => {
         a.style.transition = 'opacity 0.5s';
         a.style.opacity = '0';
         setTimeout(() => a.remove(), 500);

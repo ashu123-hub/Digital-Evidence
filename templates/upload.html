@@ -66,7 +66,26 @@
                 </div>
                 <div class="form-group">
                     <label for="remarks"><i class="fas fa-comment"></i> Remarks / Notes</label>
-                    <textarea id="remarks" name="remarks" class="form-control" rows="3" placeholder="Add context about the evidence, how it was collected, initial observations..."></textarea>
+                    <textarea id="remarks" name="remarks" class="form-control" rows="2" placeholder="Add context about the evidence, how it was collected, initial observations..."></textarea>
+                </div>
+
+                <!-- Security Access Code / PIN for Preview & Download -->
+                <div class="form-group security-code-group">
+                    <label for="access_code" class="security-code-label">
+                        <i class="fas fa-key"></i> Security Access Code / PIN (Required to Preview or Download)
+                    </label>
+                    <div class="password-input-group">
+                        <input type="password" id="access_code" name="access_code" class="form-control mono" placeholder="Set a PIN or passcode (e.g., 4829 or Evidence#2026)" autocomplete="off">
+                        <button type="button" class="btn-input-icon toggle-pass-btn" onclick="toggleAccessCodeVisibility()" title="Show/Hide PIN">
+                            <i class="fas fa-eye" id="togglePassIcon"></i>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="generateRandomPin()" title="Generate 6-Digit PIN">
+                            <i class="fas fa-wand-magic-sparkles"></i> Generate PIN
+                        </button>
+                    </div>
+                    <small class="form-hint text-muted">
+                        <i class="fas fa-shield-halved text-accent"></i> When set, anyone (including yourself on other sessions) must enter this exact code to view the image in-browser or download it.
+                    </small>
                 </div>
 
                 <!-- Security Info -->
@@ -83,6 +102,13 @@
                         <div>
                             <strong>AES-256 Encryption</strong>
                             <span>File encrypted before secure storage</span>
+                        </div>
+                    </div>
+                    <div class="security-item">
+                        <i class="fas fa-key"></i>
+                        <div>
+                            <strong>PIN/Access Code</strong>
+                            <span>Bcrypt-hashed passcode protection for viewing & downloading</span>
                         </div>
                     </div>
                     <div class="security-item">
@@ -117,9 +143,9 @@
                     <div class="pipeline-arrow"><i class="fas fa-arrow-down"></i></div>
                     <div class="pipeline-step active"><div class="step-num">4</div><div class="step-label">AES-256 Encrypt</div></div>
                     <div class="pipeline-arrow"><i class="fas fa-arrow-down"></i></div>
-                    <div class="pipeline-step active"><div class="step-num">5</div><div class="step-label">Secure Storage</div></div>
+                    <div class="pipeline-step active"><div class="step-num">5</div><div class="step-label">PIN / Passcode Protection</div></div>
                     <div class="pipeline-arrow"><i class="fas fa-arrow-down"></i></div>
-                    <div class="pipeline-step active"><div class="step-num">6</div><div class="step-label">Chain of Custody</div></div>
+                    <div class="pipeline-step active"><div class="step-num">6</div><div class="step-label">Secure Storage & Custody</div></div>
                 </div>
             </div>
         </div>
@@ -165,6 +191,31 @@ function formatSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
     return (bytes/(1024*1024)).toFixed(2) + ' MB';
+}
+
+function toggleAccessCodeVisibility() {
+    const input = document.getElementById('access_code');
+    const icon = document.getElementById('togglePassIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+function generateRandomPin() {
+    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    const input = document.getElementById('access_code');
+    input.value = pin;
+    input.type = 'text';
+    const icon = document.getElementById('togglePassIcon');
+    icon.classList.remove('fa-eye');
+    icon.classList.add('fa-eye-slash');
+    showToast(`Generated PIN: ${pin} (Make sure to save this!)`, 'info');
 }
 
 document.getElementById('uploadForm').addEventListener('submit', function() {

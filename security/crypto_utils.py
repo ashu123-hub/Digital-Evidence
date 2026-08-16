@@ -38,6 +38,15 @@ def decrypt_file(encrypted_path: str, output_path: str):
     with open(output_path, 'wb') as f:
         f.write(plaintext)
 
+def decrypt_to_bytes(encrypted_path: str) -> bytes:
+    """Decrypt an AES-256-CBC encrypted file directly to bytes in memory."""
+    with open(encrypted_path, 'rb') as f:
+        raw = f.read()
+    iv = raw[:16]
+    ciphertext = raw[16:]
+    cipher = AES.new(Config.AES_KEY, AES.MODE_CBC, iv)
+    return unpad(cipher.decrypt(ciphertext), AES.block_size)
+
 def hash_custody_record(record_data: dict, previous_hash: str) -> str:
     """Generate a hash for a chain-of-custody record linked to the previous hash."""
     record_str = (

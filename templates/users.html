@@ -5,21 +5,30 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title">System Users</h1>
-        <p class="page-subtitle">{{ users|length }} registered users</p>
+        <h1 class="page-title"><i class="fas fa-users-gear"></i> System Users</h1>
+        <p class="page-subtitle">{{ users|length }} registered user{{ 's' if users|length != 1 }}</p>
     </div>
-    <a href="{{ url_for('auth.register') }}" class="btn btn-primary"><i class="fas fa-user-plus"></i> Add User</a>
+    <button class="btn btn-primary" onclick="openAddUserModal()">
+        <i class="fas fa-user-plus"></i> Add New User
+    </button>
 </div>
 
 <div class="card">
     <div class="card-body p-0">
         <table class="data-table">
             <thead>
-                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr>
-            </thead>
-            <tbody>
-                {% for u in users %}
                 <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody">
+                {% for u in users %}
+                <tr id="user-row-{{ u._id }}">
                     <td>
                         <div style="display:flex;align-items:center;gap:0.75rem">
                             <div class="user-avatar-sm">{{ u.name[0].upper() }}</div>
@@ -27,13 +36,241 @@
                         </div>
                     </td>
                     <td class="mono">{{ u.email }}</td>
-                    <td><span class="badge badge-{{ 'danger' if u.role == 'admin' else ('primary' if u.role == 'investigator' else 'info') }}">{{ u.role.upper() }}</span></td>
-                    <td><span class="badge badge-{{ 'success' if u.status == 'active' else 'secondary' }}">{{ u.status.upper() }}</span></td>
+                    <td>
+                        <span class="badge badge-{{ 'danger' if u.role == 'admin' else ('primary' if u.role == 'investigator' else 'info') }}">
+                            {{ u.role.upper() }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-{{ 'success' if u.status == 'active' else 'secondary' }}" id="status-badge-{{ u._id }}">
+                            {{ u.status.upper() }}
+                        </span>
+                    </td>
                     <td>{{ u.created_at | datefmt }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-ghost btn-sm"
+                                    onclick="toggleUserStatus('{{ u._id }}', '{{ u.name | escape }}')"
+                                    title="{{ 'Deactivate' if u.status == 'active' else 'Activate' }} User"
+                                    id="toggle-btn-{{ u._id }}">
+                                <i class="fas fa-{{ 'user-slash' if u.status == 'active' else 'user-check' }}"></i>
+                            </button>
+                            <button class="btn btn-ghost btn-sm text-danger"
+                                    onclick="confirmDeleteUser('{{ u._id }}', '{{ u.name | escape }}')"
+                                    title="Delete User">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- Add User Modal -->
+<div id="addUserModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeAddUserModal()">
+    <div class="modal-dialog" style="max-width:480px;width:100%;">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-user-plus text-accent"></i> Add New User</h3>
+            <button class="modal-close-btn" onclick="closeAddUserModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="addUserForm" onsubmit="submitAddUser(event)">
+                <div class="form-group">
+                    <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                    <input type="text" id="newUserName" class="form-control" placeholder="e.g. Dr. John Smith" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                    <input type="email" id="newUserEmail" class="form-control" placeholder="user@agency.gov" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password <span class="text-danger">*</span></label>
+                    <div class="password-input-group">
+                        <input type="password" id="newUserPassword" class="form-control" placeholder="Min 6 characters" required minlength="6">
+                        <button type="button" class="btn-input-icon toggle-pass-btn" onclick="toggleNewPwdVisibility()">
+                            <i class="fas fa-eye" id="newPwdIcon"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role <span class="text-danger">*</span></label>
+                    <select id="newUserRole" class="form-control form-select">
+                        <option value="investigator">Investigator</option>
+                        <option value="analyst">Analyst</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div id="addUserError" class="detail-pin-error" style="display:none; margin-bottom:12px;"></div>
+                <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:1.25rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="addUserSubmitBtn">
+                        <i class="fas fa-user-plus"></i> Create User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete User Confirm Modal -->
+<div id="deleteUserModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeDeleteUserModal()">
+    <div class="modal-dialog" style="max-width:420px;width:100%;">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-trash-alt text-danger"></i> Delete User</h3>
+            <button class="modal-close-btn" onclick="closeDeleteUserModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p style="color:#e2e8f0;margin-bottom:1rem;">
+                Are you sure you want to permanently delete user <strong id="deleteUserNameLabel" style="color:#f87171;"></strong>?
+                This action <strong>cannot be undone</strong>.
+            </p>
+            <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeDeleteUserModal()">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteUserBtn" onclick="executeDeleteUser()">
+                    <i class="fas fa-trash-alt"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let pendingDeleteUserId = null;
+
+function openAddUserModal() {
+    document.getElementById('addUserModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('newUserName').focus();
+}
+function closeAddUserModal() {
+    document.getElementById('addUserModal').style.display = 'none';
+    document.body.style.overflow = '';
+    document.getElementById('addUserForm').reset();
+    document.getElementById('addUserError').style.display = 'none';
+}
+
+function toggleNewPwdVisibility() {
+    const input = document.getElementById('newUserPassword');
+    const icon = document.getElementById('newPwdIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+
+async function submitAddUser(e) {
+    e.preventDefault();
+    const btn = document.getElementById('addUserSubmitBtn');
+    const errEl = document.getElementById('addUserError');
+    errEl.style.display = 'none';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: document.getElementById('newUserName').value.trim(),
+                email: document.getElementById('newUserEmail').value.trim(),
+                password: document.getElementById('newUserPassword').value,
+                role: document.getElementById('newUserRole').value
+            })
+        });
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+            if (typeof showToast === 'function') showToast(data.message, 'success');
+            closeAddUserModal();
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            errEl.textContent = data.message || 'Failed to create user.';
+            errEl.style.display = 'block';
+        }
+    } catch (err) {
+        errEl.textContent = 'Server error. Please try again.';
+        errEl.style.display = 'block';
+    } finally {
+        btn.innerHTML = '<i class="fas fa-user-plus"></i> Create User';
+        btn.disabled = false;
+    }
+}
+
+async function toggleUserStatus(userId, userName) {
+    const btn = document.getElementById(`toggle-btn-${userId}`);
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    try {
+        const resp = await fetch(`/users/${userId}/toggle-status`, { method: 'POST' });
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+            const badge = document.getElementById(`status-badge-${userId}`);
+            if (badge) {
+                badge.textContent = data.new_status.toUpperCase();
+                badge.className = `badge badge-${data.new_status === 'active' ? 'success' : 'secondary'}`;
+            }
+            if (btn) {
+                btn.title = data.new_status === 'active' ? 'Deactivate User' : 'Activate User';
+                btn.innerHTML = `<i class="fas fa-${data.new_status === 'active' ? 'user-slash' : 'user-check'}"></i>`;
+            }
+            if (typeof showToast === 'function') showToast(data.message, 'success');
+        } else {
+            if (typeof showToast === 'function') showToast(data.message, 'danger');
+            if (btn) btn.innerHTML = `<i class="fas fa-user-slash"></i>`;
+        }
+    } catch (err) {
+        if (typeof showToast === 'function') showToast('Server error.', 'danger');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function confirmDeleteUser(userId, userName) {
+    pendingDeleteUserId = userId;
+    document.getElementById('deleteUserNameLabel').textContent = userName;
+    document.getElementById('deleteUserModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function closeDeleteUserModal() {
+    document.getElementById('deleteUserModal').style.display = 'none';
+    document.body.style.overflow = '';
+    pendingDeleteUserId = null;
+}
+
+async function executeDeleteUser() {
+    if (!pendingDeleteUserId) return;
+    const btn = document.getElementById('confirmDeleteUserBtn');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+    btn.disabled = true;
+    try {
+        const resp = await fetch(`/users/${pendingDeleteUserId}/delete`, { method: 'POST' });
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+            const row = document.getElementById(`user-row-${pendingDeleteUserId}`);
+            if (row) {
+                row.style.transition = 'opacity 0.3s';
+                row.style.opacity = '0';
+                setTimeout(() => row.remove(), 300);
+            }
+            closeDeleteUserModal();
+            if (typeof showToast === 'function') showToast(data.message, 'success');
+        } else {
+            if (typeof showToast === 'function') showToast(data.message, 'danger');
+            closeDeleteUserModal();
+        }
+    } catch (err) {
+        if (typeof showToast === 'function') showToast('Server error.', 'danger');
+    } finally {
+        btn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete';
+        btn.disabled = false;
+    }
+}
+</script>
 {% endblock %}

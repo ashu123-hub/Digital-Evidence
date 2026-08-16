@@ -71,9 +71,15 @@ def view_case(case_id):
         flash('Case not found.', 'danger')
         return redirect(url_for('cases.list_cases'))
     case['_id'] = str(case['_id'])
+    IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'}
     evidence_list = list(db.evidence.find({'case_id': case_id}).sort('uploaded_at', -1))
+    unlocked_set = set(session.get('unlocked_evidence', []))
     for e in evidence_list:
         e['_id'] = str(e['_id'])
+        ext = e.get('file_name', '').rsplit('.', 1)[-1].lower() if '.' in e.get('file_name', '') else ''
+        e['is_image'] = ext in IMAGE_EXTS
+        e['has_access_code'] = bool(e.get('access_code_hash'))
+        e['is_unlocked'] = not e['has_access_code'] or (e['evidence_id'] in unlocked_set)
     return render_template('case_detail.html', case=case, evidence_list=evidence_list)
 
 @cases_bp.route('/cases/<case_id>/close', methods=['POST'])

@@ -58,7 +58,7 @@
                     <th>Type</th>
                     <th>Case</th>
                     <th>SHA-256 (Preview)</th>
-                    <th>Encrypted</th>
+                    <th>Security</th>
                     <th>Uploaded By</th>
                     <th>Uploaded At</th>
                     <th>Status</th>
@@ -67,20 +67,48 @@
             </thead>
             <tbody>
                 {% for e in evidence_list %}
-                <tr>
+                <tr id="ev-row-{{ e.evidence_id }}">
                     <td class="mono font-semibold">
                         <a href="{{ url_for('evidence.view_evidence', evidence_id=e.evidence_id) }}" class="link-primary">{{ e.evidence_id }}</a>
                     </td>
-                    <td>{{ e.file_name }}</td>
+                    <td>
+                        <div class="file-name-cell">
+                            {% if e.preview_type == 'image' %}
+                            <i class="fas fa-image text-accent"></i>
+                            {% elif e.preview_type == 'pdf' %}
+                            <i class="fas fa-file-pdf" style="color: #ef4444;"></i>
+                            {% elif e.preview_type == 'text' %}
+                            <i class="fas fa-file-code" style="color: #06b6d4;"></i>
+                            {% elif e.preview_type == 'video' %}
+                            <i class="fas fa-file-video" style="color: #f59e0b;"></i>
+                            {% elif e.preview_type == 'audio' %}
+                            <i class="fas fa-file-audio" style="color: #a855f7;"></i>
+                            {% elif e.preview_type == 'document' %}
+                            <i class="fas fa-file-word" style="color: #3b82f6;"></i>
+                            {% elif e.preview_type == 'archive' %}
+                            <i class="fas fa-file-zipper" style="color: #eab308;"></i>
+                            {% else %}
+                            <i class="fas fa-file-shield text-muted"></i>
+                            {% endif %}
+                            <span>{{ e.file_name }}</span>
+                        </div>
+                    </td>
                     <td><span class="badge badge-secondary">{{ e.file_type }}</span></td>
                     <td class="mono">{{ e.case_id }}</td>
                     <td class="mono text-sm hash-cell" title="{{ e.sha256_hash }}">{{ e.sha256_hash[:16] if e.sha256_hash else '-' }}...</td>
                     <td>
-                        {% if e.encrypted %}
-                        <span class="badge badge-success"><i class="fas fa-lock"></i> AES-256</span>
-                        {% else %}
-                        <span class="badge badge-warning">No</span>
-                        {% endif %}
+                        <div class="security-badges-wrap">
+                            {% if e.encrypted %}
+                            <span class="badge badge-success" title="AES-256 Encrypted"><i class="fas fa-lock"></i> AES-256</span>
+                            {% endif %}
+                            {% if e.has_access_code %}
+                                {% if e.is_unlocked %}
+                                <span class="badge badge-info" title="Access Code Verified"><i class="fas fa-lock-open"></i> Unlocked</span>
+                                {% else %}
+                                <span class="badge badge-warning" title="Access Code Protected"><i class="fas fa-key"></i> Code Protected</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
                     </td>
                     <td>{{ e.uploaded_by_name }}</td>
                     <td class="text-sm">{{ e.uploaded_at | datefmt }}</td>
@@ -91,9 +119,26 @@
                     </td>
                     <td>
                         <div class="action-buttons">
-                            <a href="{{ url_for('evidence.view_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm" title="View"><i class="fas fa-eye"></i></a>
-                            <a href="{{ url_for('verification.verify_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm" title="Verify"><i class="fas fa-fingerprint"></i></a>
-                            <a href="{{ url_for('evidence.download_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm" title="Download"><i class="fas fa-download"></i></a>
+                            <button type="button" class="btn btn-ghost btn-sm btn-preview-action"
+                                    onclick="openPreviewModal('{{ e.evidence_id }}', '{{ e.file_name | escape }}', '{{ e.file_type | escape }}', '{{ e.sha256_hash }}', {{ 1 if e.has_access_code else 0 }}, {{ 1 if e.is_unlocked else 0 }}, '{{ e.preview_type }}')"
+                                    title="View / Preview Evidence">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <a href="{{ url_for('verification.verify_evidence', evidence_id=e.evidence_id) }}" class="btn btn-ghost btn-sm" title="Verify Integrity">
+                                <i class="fas fa-fingerprint"></i>
+                            </a>
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                    onclick="handleDownloadClick('{{ e.evidence_id }}', '{{ e.file_name | escape }}', '{{ e.file_type | escape }}', '{{ e.sha256_hash }}', {{ 1 if e.has_access_code else 0 }}, {{ 1 if e.is_unlocked else 0 }}, '{{ e.preview_type }}')"
+                                    title="Download">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            {% if session.get('role') in ['admin', 'investigator'] %}
+                            <button type="button" class="btn btn-ghost btn-sm text-danger"
+                                    onclick="confirmDeleteEvidence('{{ e.evidence_id }}', '{{ e.file_name | escape }}')"
+                                    title="Delete Evidence" id="del-btn-{{ e.evidence_id }}">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -110,4 +155,415 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Interactive In-Browser Preview & Access Code Verification Modal -->
+<div class="modal-overlay" id="previewModal" style="display:none" onclick="handleModalBackdropClick(event)">
+    <div class="modal-dialog modal-dialog-lg">
+        <div class="modal-header">
+            <div class="modal-title-wrap">
+                <i class="fas fa-shield-halved text-accent"></i>
+                <h3 id="modalEvidenceTitle">Evidence Viewer</h3>
+                <span class="badge badge-secondary" id="modalFileTypeBadge">File</span>
+            </div>
+            <button type="button" class="modal-close" onclick="closePreviewModal()"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="modal-body">
+            <!-- Access Code Required Form -->
+            <div id="modalLockSection" style="display:none">
+                <div class="modal-lock-card">
+                    <div class="lock-icon-wrap">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h4>Access Code Required</h4>
+                    <p class="text-muted text-sm">This evidence is protected. Enter the security access code set at upload time to view or download it.</p>
+                    
+                    <form id="modalUnlockForm" onsubmit="submitAccessCode(event)" class="modal-pin-form">
+                        <div class="form-group">
+                            <div class="password-input-group">
+                                <input type="password" id="modalAccessCode" class="form-control mono" placeholder="Enter Access Code / PIN" autocomplete="off" required autofocus>
+                                <button type="button" class="btn-input-icon toggle-pass-btn" onclick="toggleModalPinVisibility()">
+                                    <i class="fas fa-eye" id="modalPinIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="modalPinError" class="modal-pin-error" style="display:none; margin-top: 10px; padding: 8px 12px; font-size: 12px; color: #fca5a5; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 4px;"></div>
+                        <div class="modal-actions" style="margin-top: 16px;">
+                            <button type="submit" class="btn btn-primary btn-full" id="modalUnlockBtn">
+                                <i class="fas fa-key"></i> Unlock & View Evidence
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Evidence Content Preview Viewer (Unlocked) -->
+            <div id="modalPreviewSection" style="display:none">
+                <div class="preview-media-container" id="previewMediaBox">
+                    <div class="preview-loading-spinner" id="previewSpinner">
+                        <i class="fas fa-spinner fa-spin"></i> Loading secure content...
+                    </div>
+                    
+                    <!-- Image Display -->
+                    <img id="modalPreviewImage" src="" alt="Evidence Preview" class="preview-image" style="display:none;">
+                    
+                    <!-- PDF Viewer -->
+                    <iframe id="modalPreviewPdf" class="preview-iframe" style="display:none;" frameborder="0"></iframe>
+
+                    <!-- Text / Code Viewer -->
+                    <div id="modalPreviewTextWrap" class="preview-text-wrap" style="display:none;">
+                        <pre id="modalPreviewText" class="preview-code mono"></pre>
+                    </div>
+
+                    <!-- Video Player -->
+                    <video id="modalPreviewVideo" class="preview-media" controls style="display:none; max-width: 100%; max-height: 480px;"></video>
+
+                    <!-- Audio Player -->
+                    <div id="modalPreviewAudioWrap" class="preview-audio-wrap" style="display:none; text-align: center; padding: 30px;">
+                        <div style="font-size: 40px; color: #a855f7; margin-bottom: 16px;"><i class="fas fa-file-audio"></i></div>
+                        <audio id="modalPreviewAudio" controls style="width: 100%; max-width: 400px;"></audio>
+                    </div>
+
+                    <!-- Document / Binary Inspector Card -->
+                    <div id="modalPreviewDoc" class="preview-doc-card" style="display:none;">
+                        <div class="doc-icon"><i class="fas fa-file-shield"></i></div>
+                        <h4 id="modalDocName" style="color:#fff; margin-bottom:6px;">Document Evidence</h4>
+                        <p class="text-muted text-sm" id="modalDocInfo">This file type is verified and encrypted in storage.</p>
+                        <div style="margin-top: 16px;">
+                            <a id="modalDocDownloadBtn" href="#" class="btn btn-primary">
+                                <i class="fas fa-download"></i> Download Decrypted File
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="preview-info-bar">
+                    <div class="preview-meta-item">
+                        <span class="preview-meta-label">Evidence ID:</span>
+                        <span class="preview-meta-val mono" id="modalEvidenceId"></span>
+                    </div>
+                    <div class="preview-meta-item">
+                        <span class="preview-meta-label">SHA-256:</span>
+                        <span class="preview-meta-val mono text-sm" id="modalSha256"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer" id="modalFooter">
+            <a href="#" class="btn btn-primary" id="modalDownloadBtn">
+                <i class="fas fa-download"></i> Download File
+            </a>
+            <a href="#" class="btn btn-secondary" id="modalDetailsBtn">
+                <i class="fas fa-circle-info"></i> Full Details
+            </a>
+            <button type="button" class="btn btn-ghost" onclick="closePreviewModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentModalEvidence = null;
+
+function resetAllPreviewContainers() {
+    const img = document.getElementById('modalPreviewImage');
+    const pdf = document.getElementById('modalPreviewPdf');
+    const textWrap = document.getElementById('modalPreviewTextWrap');
+    const video = document.getElementById('modalPreviewVideo');
+    const audioWrap = document.getElementById('modalPreviewAudioWrap');
+    const audio = document.getElementById('modalPreviewAudio');
+    const doc = document.getElementById('modalPreviewDoc');
+    
+    if (img) { img.style.display = 'none'; img.src = ''; }
+    if (pdf) { pdf.style.display = 'none'; pdf.src = ''; }
+    if (textWrap) { textWrap.style.display = 'none'; }
+    if (video) { video.style.display = 'none'; video.pause(); video.src = ''; }
+    if (audioWrap) { audioWrap.style.display = 'none'; }
+    if (audio) { audio.pause(); audio.src = ''; }
+    if (doc) { doc.style.display = 'none'; }
+}
+
+function openPreviewModal(evidenceId, fileName, fileType, sha256, hasAccessCode, isUnlocked, previewType) {
+    currentModalEvidence = { 
+        evidenceId: evidenceId, 
+        fileName: fileName, 
+        fileType: fileType, 
+        sha256: sha256, 
+        hasAccessCode: Boolean(hasAccessCode), 
+        isUnlocked: Boolean(isUnlocked),
+        previewType: previewType || 'file'
+    };
+    
+    const titleEl = document.getElementById('modalEvidenceTitle');
+    const typeBadge = document.getElementById('modalFileTypeBadge');
+    const evIdEl = document.getElementById('modalEvidenceId');
+    const hashEl = document.getElementById('modalSha256');
+    const detailsBtn = document.getElementById('modalDetailsBtn');
+    const downloadBtn = document.getElementById('modalDownloadBtn');
+
+    if (titleEl) titleEl.textContent = fileName;
+    if (typeBadge) typeBadge.textContent = fileType || 'FILE';
+    if (evIdEl) evIdEl.textContent = evidenceId;
+    if (hashEl) hashEl.textContent = sha256 ? (sha256.substring(0, 20) + '...') : '-';
+    if (detailsBtn) detailsBtn.href = `/evidence/${evidenceId}`;
+    if (downloadBtn) downloadBtn.href = `/evidence/${evidenceId}/download`;
+
+    const modal = document.getElementById('previewModal');
+    const lockSection = document.getElementById('modalLockSection');
+    const previewSection = document.getElementById('modalPreviewSection');
+    const modalFooter = document.getElementById('modalFooter');
+    const pinError = document.getElementById('modalPinError');
+    const codeInput = document.getElementById('modalAccessCode');
+
+    if (pinError) pinError.style.display = 'none';
+    if (codeInput) codeInput.value = '';
+
+    if (currentModalEvidence.hasAccessCode && !currentModalEvidence.isUnlocked) {
+        if (lockSection) lockSection.style.display = 'block';
+        if (previewSection) previewSection.style.display = 'none';
+        if (modalFooter) modalFooter.style.display = 'none';
+        setTimeout(() => { if (codeInput) codeInput.focus(); }, 100);
+    } else {
+        showPreviewUnlocked(evidenceId, currentModalEvidence.previewType, fileName);
+    }
+
+    if (modal) modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+async function showPreviewUnlocked(evidenceId, previewType, fileName) {
+    const lockSection = document.getElementById('modalLockSection');
+    const previewSection = document.getElementById('modalPreviewSection');
+    const modalFooter = document.getElementById('modalFooter');
+    const spinner = document.getElementById('previewSpinner');
+
+    if (lockSection) lockSection.style.display = 'none';
+    if (previewSection) previewSection.style.display = 'block';
+    if (modalFooter) modalFooter.style.display = 'flex';
+    resetAllPreviewContainers();
+    
+    if (spinner) {
+        spinner.style.display = 'flex';
+        spinner.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Decrypting evidence in memory...';
+    }
+
+    const inlineUrl = `/evidence/${evidenceId}/inline?t=` + new Date().getTime();
+
+    if (previewType === 'image') {
+        const img = document.getElementById('modalPreviewImage');
+        if (img) {
+            img.onload = () => { if (spinner) spinner.style.display = 'none'; img.style.display = 'block'; };
+            img.onerror = () => { if (spinner) spinner.innerHTML = '<i class="fas fa-triangle-exclamation text-danger"></i> Failed to render image preview.'; };
+            img.src = inlineUrl;
+            if (img.complete && img.naturalWidth > 0) {
+                if (spinner) spinner.style.display = 'none';
+                img.style.display = 'block';
+            }
+        }
+    } else if (previewType === 'pdf') {
+        const pdf = document.getElementById('modalPreviewPdf');
+        if (pdf) {
+            pdf.onload = () => { if (spinner) spinner.style.display = 'none'; pdf.style.display = 'block'; };
+            pdf.src = inlineUrl;
+            setTimeout(() => { if (spinner) spinner.style.display = 'none'; pdf.style.display = 'block'; }, 800);
+        }
+    } else if (previewType === 'text') {
+        try {
+            const resp = await fetch(inlineUrl);
+            const txt = await resp.text();
+            if (spinner) spinner.style.display = 'none';
+            const textWrap = document.getElementById('modalPreviewTextWrap');
+            const pre = document.getElementById('modalPreviewText');
+            if (pre) pre.textContent = txt;
+            if (textWrap) textWrap.style.display = 'block';
+        } catch (err) {
+            if (spinner) spinner.innerHTML = '<i class="fas fa-triangle-exclamation text-danger"></i> Failed to load text preview.';
+        }
+    } else if (previewType === 'video') {
+        const video = document.getElementById('modalPreviewVideo');
+        if (video) {
+            video.onloadeddata = () => { if (spinner) spinner.style.display = 'none'; video.style.display = 'block'; };
+            video.src = inlineUrl;
+            setTimeout(() => { if (spinner) spinner.style.display = 'none'; video.style.display = 'block'; }, 600);
+        }
+    } else if (previewType === 'audio') {
+        const audioWrap = document.getElementById('modalPreviewAudioWrap');
+        const audio = document.getElementById('modalPreviewAudio');
+        if (audio) audio.src = inlineUrl;
+        if (spinner) spinner.style.display = 'none';
+        if (audioWrap) audioWrap.style.display = 'block';
+    } else {
+        // Document / Binary inspection card
+        if (spinner) spinner.style.display = 'none';
+        const docCard = document.getElementById('modalPreviewDoc');
+        const docName = document.getElementById('modalDocName');
+        const docInfo = document.getElementById('modalDocInfo');
+        const docDownload = document.getElementById('modalDocDownloadBtn');
+        if (docName) docName.textContent = fileName || 'Evidence File';
+        if (docInfo) docInfo.textContent = `Encrypted forensic evidence (${currentModalEvidence ? currentModalEvidence.fileType : 'File'}). Click below to download decrypted copy.`;
+        if (docDownload) docDownload.href = `/evidence/${evidenceId}/download`;
+        if (docCard) docCard.style.display = 'block';
+    }
+}
+
+async function submitAccessCode(e) {
+    e.preventDefault();
+    if (!currentModalEvidence) return;
+    
+    const codeInput = document.getElementById('modalAccessCode');
+    const unlockBtn = document.getElementById('modalUnlockBtn');
+    const pinError = document.getElementById('modalPinError');
+    const enteredCode = codeInput ? codeInput.value.trim() : '';
+
+    if (!enteredCode) return;
+
+    if (unlockBtn) {
+        unlockBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying Code...';
+        unlockBtn.disabled = true;
+    }
+    if (pinError) pinError.style.display = 'none';
+
+    try {
+        const resp = await fetch(`/evidence/${currentModalEvidence.evidenceId}/verify-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_code: enteredCode })
+        });
+        const data = await resp.json();
+        
+        if (resp.ok && data.success) {
+            currentModalEvidence.isUnlocked = true;
+            if (typeof showToast === 'function') showToast('Access code verified! Unlocked.', 'success');
+            showPreviewUnlocked(currentModalEvidence.evidenceId, currentModalEvidence.previewType, currentModalEvidence.fileName);
+        } else {
+            if (pinError) {
+                pinError.textContent = data.message || 'Incorrect access code. Access denied.';
+                pinError.style.display = 'block';
+            }
+            if (codeInput) {
+                codeInput.classList.add('input-shake');
+                setTimeout(() => codeInput.classList.remove('input-shake'), 500);
+                codeInput.select();
+            }
+        }
+    } catch (err) {
+        if (pinError) {
+            pinError.textContent = 'Server connection error. Please try again.';
+            pinError.style.display = 'block';
+        }
+    } finally {
+        if (unlockBtn) {
+            unlockBtn.innerHTML = '<i class="fas fa-key"></i> Unlock & View Evidence';
+            unlockBtn.disabled = false;
+        }
+    }
+}
+
+function handleDownloadClick(evidenceId, fileName, fileType, sha256, hasAccessCode, isUnlocked, previewType) {
+    if (Boolean(hasAccessCode) && !Boolean(isUnlocked)) {
+        openPreviewModal(evidenceId, fileName, fileType, sha256, hasAccessCode, isUnlocked, previewType);
+    } else {
+        window.location.href = `/evidence/${evidenceId}/download`;
+    }
+}
+
+function toggleModalPinVisibility() {
+    const input = document.getElementById('modalAccessCode');
+    const icon = document.getElementById('modalPinIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+function closePreviewModal() {
+    const modal = document.getElementById('previewModal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+    resetAllPreviewContainers();
+}
+
+function handleModalBackdropClick(e) {
+    if (e.target.id === 'previewModal') {
+        closePreviewModal();
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closePreviewModal();
+        closeDeleteEvidenceModal();
+    }
+});
+
+// ---- Delete Evidence ----
+let pendingDeleteEvidenceId = null;
+
+function confirmDeleteEvidence(evidenceId, fileName) {
+    pendingDeleteEvidenceId = evidenceId;
+    const label = document.getElementById('deleteEvidenceNameLabel');
+    if (label) label.textContent = fileName;
+    const modal = document.getElementById('deleteEvidenceModal');
+    if (modal) modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDeleteEvidenceModal() {
+    const modal = document.getElementById('deleteEvidenceModal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+    pendingDeleteEvidenceId = null;
+}
+
+async function executeDeleteEvidence() {
+    if (!pendingDeleteEvidenceId) return;
+    const btn = document.getElementById('confirmDeleteEvidenceBtn');
+    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...'; btn.disabled = true; }
+    try {
+        const resp = await fetch(`/evidence/${pendingDeleteEvidenceId}/delete`, { method: 'POST' });
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+            const row = document.getElementById(`ev-row-${pendingDeleteEvidenceId}`);
+            if (row) { row.style.transition = 'opacity 0.3s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 300); }
+            closeDeleteEvidenceModal();
+            if (typeof showToast === 'function') showToast(data.message, 'success');
+        } else {
+            closeDeleteEvidenceModal();
+            if (typeof showToast === 'function') showToast(data.message || 'Delete failed.', 'danger');
+        }
+    } catch (err) {
+        if (typeof showToast === 'function') showToast('Server error. Please try again.', 'danger');
+    } finally {
+        if (btn) { btn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete'; btn.disabled = false; }
+    }
+}
+</script>
+
+<!-- Delete Evidence Confirm Modal -->
+<div id="deleteEvidenceModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeDeleteEvidenceModal()">
+    <div class="modal-dialog" style="max-width:420px;width:100%;">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-trash-alt text-danger"></i> Delete Evidence</h3>
+            <button class="modal-close-btn" onclick="closeDeleteEvidenceModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p style="color:#e2e8f0;margin-bottom:0.5rem;">
+                Permanently delete <strong id="deleteEvidenceNameLabel" style="color:#f87171;"></strong>?
+            </p>
+            <p class="text-muted text-sm" style="margin-bottom:1.25rem;">The encrypted file, chain of custody records, and evidence entry will be permanently removed. This cannot be undone.</p>
+            <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeDeleteEvidenceModal()">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteEvidenceBtn" onclick="executeDeleteEvidence()">
+                    <i class="fas fa-trash-alt"></i> Delete Permanently
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
