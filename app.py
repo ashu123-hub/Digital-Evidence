@@ -17,21 +17,38 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Ensure folders exist
-    os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
-    os.makedirs(Config.ENCRYPTED_FOLDER, exist_ok=True)
-    os.makedirs(Config.REPORTS_FOLDER, exist_ok=True)
+    # Ensure folders exist (on Vercel, Config paths already point to /tmp)
+    try:
+        os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
+        os.makedirs(Config.ENCRYPTED_FOLDER, exist_ok=True)
+        os.makedirs(Config.REPORTS_FOLDER, exist_ok=True)
+    except OSError:
+        pass  # Read-only filesystem — ok for Vercel
+
     # Only set up filesystem sessions when NOT on Vercel (Vercel uses cookie sessions)
     if not os.environ.get('VERCEL'):
         session_dir = 'flask_session'
         os.makedirs(session_dir, exist_ok=True)
         app.config['SESSION_FILE_DIR'] = session_dir
 
-    # Initialize MongoDB
+    # Initialize MongoDB connection
     db = init_db(app)
 
-    # Seed default admin user if not exists
-    seed_admin(db)
+    # Defer seeding to first request to avoid blocking cold start
+    _seeded = {'done': False}
+
+    @app.before_request
+    def seed_on_first_request():
+        if not _seeded['done']:
+            _seeded['done'] = True
+            from database import get_db
+            _db = get_db()
+            if _db is not None:
+                try:
+                    seed_admin(_db)
+                except Exception as e:
+                    import logging
+                    logging.warning(f'Seed skipped: {e}')
 
     # Register blueprints
     app.register_blueprint(auth_bp)
@@ -79,7 +96,9 @@ def create_app():
     return app
 
 def seed_admin(db):
-    """Create default admin, investigator, and analyst accounts."""
+    """Create default admin, investigator, and analyst accounts. Safe to call with db=None."""
+    if db is None:
+        return
     users = [
         {'name': 'System Admin', 'email': 'admin@dems.gov', 'password': 'Admin@123', 'role': 'admin'},
         {'name': 'John Investigator', 'email': 'investigator@dems.gov', 'password': 'Inv@123', 'role': 'investigator'},

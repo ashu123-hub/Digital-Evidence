@@ -20,18 +20,16 @@ def init_db(app):
         # Use certifi CA bundle so Vercel's Python runtime can verify Atlas SSL certs
         is_atlas = 'mongodb+srv' in uri or 'mongodb.net' in uri
         kwargs = dict(
-            serverSelectionTimeoutMS=15000,
-            connectTimeoutMS=15000,
-            socketTimeoutMS=30000,
+            serverSelectionTimeoutMS=8000,   # Must finish before Vercel's 10s cold-start limit
+            connectTimeoutMS=8000,
+            socketTimeoutMS=20000,
             retryWrites=True,
         )
         if is_atlas:
             kwargs['tls'] = True
+            kwargs['tlsAllowInvalidCertificates'] = True  # Bypass cert check on Vercel runtime
             if CA_FILE:
                 kwargs['tlsCAFile'] = CA_FILE
-            else:
-                # Fallback: skip cert verification if certifi unavailable
-                kwargs['tlsAllowInvalidCertificates'] = True
         client = MongoClient(uri, **kwargs)
         # Handle database name extraction safely
         try:
