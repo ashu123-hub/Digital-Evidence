@@ -1,6 +1,8 @@
 import os
 import uuid
 import tempfile
+import zipfile
+import io
 from datetime import datetime
 from flask import (Blueprint, render_template, request, redirect,
                    url_for, session, flash, send_file, jsonify, Response)
@@ -263,30 +265,12 @@ def verify_evidence_code(evidence_id):
 @evidence_bp.route('/evidence/<evidence_id>/inline')
 @login_required
 def inline_evidence(evidence_id):
-    db = get_db()
-    ev = db.evidence.find_one({'evidence_id': evidence_id})
-    if not ev:
-        return "Evidence not found", 404
-
-    code = request.args.get('code')
-    if not is_evidence_unlocked(ev, code):
-        return "Access code required to view this evidence.", 403
-
-    encrypted_path = ev.get('encrypted_path')
-    if not encrypted_path or not os.path.exists(encrypted_path):
-        return "Encrypted file not found on server.", 404
-
-    try:
-        data = decrypt_to_bytes(encrypted_path)
-    except Exception as e:
-        return f"Decryption error: {str(e)}", 500
-
-    preview_type, mimetype = get_preview_info(ev.get('file_name', ''))
-
-    response = Response(data, mimetype=mimetype)
-    response.headers['Content-Disposition'] = f'inline; filename="{ev["file_name"]}"'
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    return response
+    """In-browser preview is disabled for all evidence types to preserve forensic integrity."""
+    return Response(
+        "In-browser preview is disabled for all evidence types to protect forensic integrity. Evidence remains encrypted at rest.",
+        status=403,
+        mimetype="text/plain"
+    )
 
 @evidence_bp.route('/evidence/<evidence_id>')
 @login_required
@@ -352,9 +336,10 @@ def view_evidence(evidence_id):
                            has_access_code=has_access_code,
                            is_unlocked=is_unlocked)
 
-@evidence_bp.route('/evidence/<evidence_id>/download')
+@evidence_bp.route('/evidence/<evidence_id>/download-hash')
 @login_required
-def download_evidence(evidence_id):
+def download_evidence_hash(evidence_id):
+    """Generate and return a .hash file for the given evidence."""
     db = get_db()
     ev = db.evidence.find_one({'evidence_id': evidence_id})
     if not ev:
@@ -363,49 +348,158 @@ def download_evidence(evidence_id):
 
     code = request.args.get('code')
     if not is_evidence_unlocked(ev, code):
-        flash('Security Access Code is required to download this evidence.', 'danger')
+        flash('Security Access Code is required to download the hash file.', 'danger')
         return redirect(url_for('evidence.view_evidence', evidence_id=evidence_id))
 
-    encrypted_path = ev.get('encrypted_path')
-    if not encrypted_path or not os.path.exists(encrypted_path):
-        flash('Encrypted file not found on server.', 'danger')
-        return redirect(url_for('evidence.view_evidence', evidence_id=evidence_id))
+    sha256_hash = ev.get('sha256_hash', 'N/A')
+    uploaded_at = ev.get('uploaded_at', '')
+    downloaded_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
 
-    # Decrypt to temp file
-    tmp_dir = tempfile.mkdtemp()
-    decrypted_path = os.path.join(tmp_dir, ev['file_name'])
-    decrypt_file(encrypted_path, decrypted_path)
+    hash_content = (
+        f"========================================\n"
+        f"  DIGITAL EVIDENCE MANAGEMENT SYSTEM\n"
+        f"  Evidence Hash Certificate\n"
+        f"========================================\n\n"
+        f"Evidence ID   : {ev.get('evidence_id', 'N/A')}\n"
+        f"File Name     : {ev.get('file_name', 'N/A')}\n"
+        f"File Type     : {ev.get('file_type', 'N/A')}\n"
+        f"Case ID       : {ev.get('case_id', 'N/A')}\n"
+        f"Uploaded By   : {ev.get('uploaded_by_name', 'N/A')}\n"
+        f"Uploaded At   : {str(uploaded_at)[:19]} UTC\n"
+        f"Downloaded At : {downloaded_at}\n"
+        f"Downloaded By : {session.get('user_name', 'N/A')}\n\n"
+        f"----------------------------------------\n"
+        f"Algorithm     : SHA-256\n"
+        f"Hash Value    : {sha256_hash}\n"
+        f"----------------------------------------\n\n"
+        f"To verify integrity:\n"
+        f"  Windows : certutil -hashfile <filename> SHA256\n"
+        f"  Linux   : sha256sum <filename>\n"
+        f"  macOS   : shasum -a 256 <filename>\n\n"
+        f"Compare the output with the Hash Value above.\n"
+        f"Any mismatch indicates the file has been tampered with.\n"
+        f"========================================\n"
+    )
 
-    # Log download
+    # Log the hash download
     db.audit_logs.insert_one({
         'user_id': session['user_id'],
         'user_name': session['user_name'],
         'evidence_id': evidence_id,
-        'action': 'DOWNLOADED',
+        'action': 'HASH_DOWNLOADED',
         'ip_address': request.remote_addr,
         'timestamp': datetime.utcnow(),
         'status': 'SUCCESS',
-        'details': f"Evidence {evidence_id} downloaded."
+        'details': f"Hash file downloaded for evidence {evidence_id}."
+    })
+
+    hash_filename = f"{evidence_id}_SHA256.hash"
+    return Response(
+        hash_content,
+        mimetype='text/plain',
+        headers={
+            'Content-Disposition': f'attachment; filename="{hash_filename}"',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+        }
+    )
+
+
+@evidence_bp.route('/evidence/<evidence_id>/download')
+@login_required
+def download_evidence(evidence_id):
+    """Raw evidence files cannot be downloaded — redirect to hash certificate download."""
+    code = request.args.get('code')
+    if code:
+        return redirect(url_for('evidence.download_evidence_bundle', evidence_id=evidence_id, code=code))
+    return redirect(url_for('evidence.download_evidence_bundle', evidence_id=evidence_id))
+
+
+
+@evidence_bp.route('/evidence/<evidence_id>/download-bundle')
+@login_required
+def download_evidence_bundle(evidence_id):
+    """Return only the SHA-256 hash certificate — the evidence file is never decrypted or sent."""
+    db = get_db()
+    ev = db.evidence.find_one({'evidence_id': evidence_id})
+    if not ev:
+        flash('Evidence not found.', 'danger')
+        return redirect(url_for('evidence.list_evidence'))
+
+    code = request.args.get('code')
+    if not is_evidence_unlocked(ev, code):
+        flash('Security Access Code is required.', 'danger')
+        return redirect(url_for('evidence.view_evidence', evidence_id=evidence_id))
+
+    # Build hash certificate — NO decryption of evidence file, image stays encrypted
+    sha256_hash = ev.get('sha256_hash', 'N/A')
+    uploaded_at = ev.get('uploaded_at', '')
+    downloaded_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    hash_content = (
+        f"========================================\n"
+        f"  DIGITAL EVIDENCE MANAGEMENT SYSTEM\n"
+        f"  Evidence Hash Certificate\n"
+        f"========================================\n\n"
+        f"Evidence ID   : {ev.get('evidence_id', 'N/A')}\n"
+        f"File Name     : {ev.get('file_name', 'N/A')}\n"
+        f"File Type     : {ev.get('file_type', 'N/A')}\n"
+        f"Case ID       : {ev.get('case_id', 'N/A')}\n"
+        f"Uploaded By   : {ev.get('uploaded_by_name', 'N/A')}\n"
+        f"Uploaded At   : {str(uploaded_at)[:19]} UTC\n"
+        f"Downloaded At : {downloaded_at}\n"
+        f"Downloaded By : {session.get('user_name', 'N/A')}\n\n"
+        f"----------------------------------------\n"
+        f"Algorithm     : SHA-256\n"
+        f"Hash Value    : {sha256_hash}\n"
+        f"----------------------------------------\n\n"
+        f"NOTE: The evidence file remains encrypted on the server.\n"
+        f"      This certificate is issued for integrity verification only.\n\n"
+        f"To verify integrity (when you have the original file):\n"
+        f"  Windows : certutil -hashfile \"{ev.get('file_name')}\" SHA256\n"
+        f"  Linux   : sha256sum \"{ev.get('file_name')}\"\n"
+        f"  macOS   : shasum -a 256 \"{ev.get('file_name')}\"\n\n"
+        f"Compare the output with the Hash Value above.\n"
+        f"Any mismatch indicates the file has been tampered with.\n"
+        f"========================================\n"
+    )
+
+    # Audit log — only hash issued, evidence file NOT touched
+    db.audit_logs.insert_one({
+        'user_id': session['user_id'],
+        'user_name': session['user_name'],
+        'evidence_id': evidence_id,
+        'action': 'HASH_DOWNLOADED',
+        'ip_address': request.remote_addr,
+        'timestamp': datetime.utcnow(),
+        'status': 'SUCCESS',
+        'details': f"Hash certificate downloaded for {evidence_id} (evidence file NOT decrypted)."
     })
     last_entry = db.chain_of_custody.find_one(
         {'evidence_id': evidence_id}, sort=[('timestamp', -1)])
-    prev_hash = last_entry['record_hash'] if last_entry else '0' * 64
+    prev_hash_val = last_entry['record_hash'] if last_entry else '0' * 64
     record_data = {'evidence_id': evidence_id, 'user_id': session['user_id'],
-                   'action': 'DOWNLOADED', 'timestamp': str(datetime.utcnow())}
-    record_hash = hash_custody_record(record_data, prev_hash)
+                   'action': 'HASH_DOWNLOADED', 'timestamp': str(datetime.utcnow())}
+    record_hash = hash_custody_record(record_data, prev_hash_val)
     db.chain_of_custody.insert_one({
         'custody_id': str(uuid.uuid4()),
         'evidence_id': evidence_id,
         'user_id': session['user_id'],
         'user_name': session['user_name'],
-        'action': 'DOWNLOADED',
+        'action': 'HASH_DOWNLOADED',
         'timestamp': datetime.utcnow(),
-        'previous_hash': prev_hash,
+        'previous_hash': prev_hash_val,
         'record_hash': record_hash,
-        'remarks': f"Downloaded by {session['user_name']}"
+        'remarks': f"Hash certificate issued to {session['user_name']} — evidence remains encrypted."
     })
 
-    return send_file(decrypted_path, as_attachment=True, download_name=ev['file_name'])
+    hash_filename = f"{evidence_id}_SHA256.hash"
+    return Response(
+        hash_content,
+        mimetype='text/plain',
+        headers={
+            'Content-Disposition': f'attachment; filename="{hash_filename}"',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+        }
+    )
 
 
 @evidence_bp.route('/evidence/<evidence_id>/delete', methods=['POST'])
